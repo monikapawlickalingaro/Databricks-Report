@@ -65,24 +65,19 @@
   }
 
   /* ── 1. Client tool: agent-driven dashboard navigation ──
-     CONFIRMED Databricks URL pattern (tested 2026-07):
-       Default/first page:  BASE/published?o=ORG_ID           (no page segment)
-       Any other page:      BASE/published/pages/PAGE_ID?o=ORG_ID
-     Unlike Power BI (page ID as a query parameter), Databricks appends
-     the page ID as a PATH SEGMENT, and the default page has none at all
-     — that's why the default page's value below is `null`, not a string.
-
-     PLACEHOLDER — fill in once the dashboard is chosen:
-       - DATABRICKS_BASE: workspace host + dashboard ID
-       - DATABRICKS_QUERY: the ?o=... org ID
-       - DASHBOARD_PAGES: one entry per page, keys are what the agent
-         says (becomes the enum in navigate_to_page), values are the
-         PAGE_ID from the URL (or null for the default page) */
+     CONFIRMED Databricks EMBED URL pattern (tested 2026-07):
+       Base:                 https://{host}/embed/dashboardsv3/{id}?o={org}
+     UNCONFIRMED — hypothesis, not yet tested: page navigation appends
+     the same "/pages/{pageId}" segment used on the /published (viewing)
+     URL, giving:
+       Any other page:  https://{host}/embed/dashboardsv3/{id}/pages/{pageId}?o={org}
+     Test this after deploying — if a page doesn't render, this is the
+     first thing to check. */
 
   const DATABRICKS_BASE =
-    "https://adb-8477541654658543.3.azuredatabricks.net/embed/dashboardsv3/01f18b9f63f21fd882e303621bf1510a?o=8477541654658543";
+    "https://adb-8477541654658543.3.azuredatabricks.net/embed/dashboardsv3/01f18b9f63f21fd882e303621bf1510a";
   const DATABRICKS_QUERY = "?o=8477541654658543";
- 
+
   const DASHBOARD_PAGES = {
     summary: null,
     customers: "243c9421"
@@ -179,9 +174,16 @@
 
      PLACEHOLDER — same base/query as above; the dashboard's own default
      view, not a specific page, unless you want this to open somewhere
-     specific. */
+     specific.
 
-  const REPORT_DIRECT_LINK = DATABRICKS_BASE + DATABRICKS_QUERY;
+     IMPORTANT: this is intentionally NOT DATABRICKS_BASE (which now
+     points to the /embed/ URL, meant only for the iframe). Opening the
+     /embed/ URL in a normal browser tab is the wrong experience — this
+     uses the /published (viewing) URL instead, the one with full
+     Databricks UI chrome, appropriate for a direct visit. */
+
+  const REPORT_DIRECT_LINK =
+    "https://adb-8477541654658543.3.azuredatabricks.net/dashboardsv3/01f18b9f63f21fd882e303621bf1510a/published?o=8477541654658543";
 
   function openReportLink() {
     window.open(REPORT_DIRECT_LINK, "_blank", "noopener");
@@ -200,12 +202,12 @@
      If this project shares a Power Automate flow/channel with another
      Report Trainer product (e.g. the Power BI one), make sure the
      "report" value below identifies the platform too, e.g.
-     "Databricks — [DASHBOARD_NAME]" — not just the dashboard's bare
+     "Databricks — Retail Revenue & Supply Report" — not just the dashboard's bare
      name — so submissions aren't ambiguous in a shared Teams channel.
 
      PLACEHOLDER: HANDOFF_WEBHOOK — the Power Automate trigger URL. */
 
-  const HANDOFF_WEBHOOK = "https://default2ee548e16be84729b86ef482e29d2c.9f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/451e4aab07094a5ba18a85afd0a8085d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=t-qqVgWweRwYRrjYD0tI4Ipf-Da7W4eKc2bO5MNOzlk";
+  const HANDOFF_WEBHOOK = "[POWER_AUTOMATE_TRIGGER_URL]";
 
   const handoff = document.getElementById("handoff");
   const handoffQuestion = document.getElementById("handoff-question");
@@ -250,7 +252,7 @@
       return;
     }
 
-    /* PLACEHOLDER: "[DASHBOARD_NAME]" — replace once the dashboard is
+    /* PLACEHOLDER: "Retail Revenue & Supply Report" — replace once the dashboard is
        chosen. Keep the "Databricks — " prefix if this shares a webhook
        with another Report Trainer product (see note above). */
     const payload = {
