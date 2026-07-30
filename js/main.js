@@ -207,7 +207,7 @@
 
      PLACEHOLDER: HANDOFF_WEBHOOK — the Power Automate trigger URL. */
 
-  const HANDOFF_WEBHOOK = "[POWER_AUTOMATE_TRIGGER_URL]";
+  const HANDOFF_WEBHOOK = "https://default2ee548e16be84729b86ef482e29d2c.9f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/451e4aab07094a5ba18a85afd0a8085d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=t-qqVgWweRwYRrjYD0tI4Ipf-Da7W4eKc2bO5MNOzlk";
 
   const handoff = document.getElementById("handoff");
   const handoffQuestion = document.getElementById("handoff-question");
