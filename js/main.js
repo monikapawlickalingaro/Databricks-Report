@@ -80,7 +80,7 @@
          PAGE_ID from the URL (or null for the default page) */
 
   const DATABRICKS_BASE =
-    "https://adb-8477541654658543.3.azuredatabricks.net/dashboardsv3/01f18b9f63f21fd882e303621bf1510a/published";
+    "https://adb-8477541654658543.3.azuredatabricks.net/embed/dashboardsv3/01f18b9f63f21fd882e303621bf1510a?o=8477541654658543";
   const DATABRICKS_QUERY = "?o=8477541654658543";
  
   const DASHBOARD_PAGES = {
