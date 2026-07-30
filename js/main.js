@@ -1,0 +1,319 @@
+/* Report User Trainer — Databricks edition — shell logic
+   The ElevenLabs widget handles the conversation (mic, TTS, transcript).
+   This file wires up the client tools the agent can call:
+     navigate_to_page        — switch the dashboard page
+     request_human_trainer   — open the escalation form
+     show_inspiration_video  — show a short inspiration video
+     open_report_link        — open the full dashboard in a new tab
+
+   ARCHITECTURE NOTE: escalation uses a direct fetch() from the browser
+   to a Power Automate webhook URL (see section 3 below). This is a
+   deliberate simplification for free-tier Power Automate, which doesn't
+   support the Condition step a more secure "Webhook Tool" architecture
+   would need to verify a secret server-side. Tradeoff: the webhook URL
+   is visible in this public repo's client-side code. Revisit if this
+   project moves to a paid Power Automate tier or a more sensitive
+   deployment. */
+
+(function () {
+  "use strict";
+
+  const reportFrame = document.getElementById("report-frame");
+
+  /* ── 0. Intro video overlay ──
+     Try to autoplay WITH sound first — works for returning visitors and
+     many browsers on a first visit too. If the browser blocks it, fall
+     back to muted autoplay with a visible "tap for sound" button, so the
+     video is never broken either way. */
+
+  const videoOverlay = document.getElementById("video-overlay");
+  const introVideo = document.getElementById("intro-video");
+  const videoClose = document.getElementById("video-close");
+  const videoUnmute = document.getElementById("video-unmute");
+
+  function hideVideoOverlay() {
+    videoOverlay.hidden = true;
+    introVideo.pause();
+  }
+
+  if (videoOverlay && introVideo && videoClose && videoUnmute) {
+    introVideo.addEventListener("ended", hideVideoOverlay);
+    videoClose.addEventListener("click", hideVideoOverlay);
+
+    videoUnmute.addEventListener("click", function () {
+      introVideo.muted = false;
+      introVideo.play().catch(function () {});
+      videoUnmute.hidden = true;
+    });
+
+    /* Attempt 1: autoplay with sound. */
+    videoUnmute.hidden = true;
+    introVideo.play().catch(function () {
+      /* Blocked — fall back to muted autoplay and show the button. */
+      introVideo.muted = true;
+      videoUnmute.hidden = false;
+      introVideo.play().catch(function () {
+        /* Even muted autoplay can be blocked in rare cases — the button
+           stays visible so a click can still start it. */
+      });
+    });
+  } else if (videoOverlay) {
+    console.warn(
+      "[Report Trainer] Video overlay markup incomplete — check that " +
+      "index.html has #intro-video, #video-close, and #video-unmute."
+    );
+  }
+
+  /* ── 1. Client tool: agent-driven dashboard navigation ──
+     CONFIRMED Databricks URL pattern (tested 2026-07):
+       Default/first page:  BASE/published?o=ORG_ID           (no page segment)
+       Any other page:      BASE/published/pages/PAGE_ID?o=ORG_ID
+     Unlike Power BI (page ID as a query parameter), Databricks appends
+     the page ID as a PATH SEGMENT, and the default page has none at all
+     — that's why the default page's value below is `null`, not a string.
+
+     PLACEHOLDER — fill in once the dashboard is chosen:
+       - DATABRICKS_BASE: workspace host + dashboard ID
+       - DATABRICKS_QUERY: the ?o=... org ID
+       - DASHBOARD_PAGES: one entry per page, keys are what the agent
+         says (becomes the enum in navigate_to_page), values are the
+         PAGE_ID from the URL (or null for the default page) */
+
+  const DATABRICKS_BASE =
+    "https://adb-8477541654658543.3.azuredatabricks.net/dashboardsv3/01f18b9f63f21fd882e303621bf1510a/published";
+  const DATABRICKS_QUERY = "?o=8477541654658543";
+ 
+  const DASHBOARD_PAGES = {
+    summary: null,
+    customers: "243c9421"
+  };
+
+  function navigateToPage(params) {
+    if (!(params.page in DASHBOARD_PAGES)) {
+      console.warn("[Report Trainer] Unknown page:", params.page);
+      return "Error: that page is not configured on this site.";
+    }
+
+    const pageId = DASHBOARD_PAGES[params.page];
+    const pageLabel = params.page.replace(/_/g, " ");
+
+    /* Resolve only once the iframe has actually rendered — otherwise the agent
+       starts describing a page the user can't see yet. */
+    return new Promise(function (resolve) {
+      let settled = false;
+
+      function done(msg) {
+        if (settled) return;
+        settled = true;
+        reportFrame.removeEventListener("load", onLoad);
+        resolve(msg);
+      }
+
+      function onLoad() {
+        setTimeout(function () {
+          done("Done. The " + pageLabel + " page is now visible in the dashboard.");
+        }, 2000);
+      }
+
+      reportFrame.addEventListener("load", onLoad);
+      reportFrame.src = pageId
+        ? DATABRICKS_BASE + "/pages/" + pageId + DATABRICKS_QUERY
+        : DATABRICKS_BASE + DATABRICKS_QUERY;
+
+      /* Safety net: never hang the agent if the dashboard is slow or blocked. */
+      setTimeout(function () {
+        done("The " + pageLabel + " page is opening — it may take a moment.");
+      }, 8000);
+    });
+  }
+
+  /* ── 2. Client tool: show an inspiration video ──
+     Videos are hardcoded on purpose, keyed by topic — the agent picks
+     from this fixed list, it never supplies an arbitrary URL. That keeps
+     a voice agent from ever being able to embed unknown content on the
+     page. Add more entries here as you record more videos.
+
+     PLACEHOLDER — replace with a real YouTube video ID. */
+
+  const INSPIRATION_VIDEOS = {
+    general: "x7_6Dp5lgsg"
+    /* voice_navigation: "SOME_OTHER_VIDEO_ID", */
+    /* escalation_demo:  "SOME_OTHER_VIDEO_ID", */
+  };
+
+  const inspirationModal = document.getElementById("inspiration-video");
+  const inspirationFrame = document.getElementById("inspiration-video-frame");
+  const inspirationClose = document.getElementById("inspiration-video-close");
+
+  function showInspirationVideo(params) {
+    const key = (params && params.video) || "general";
+    const videoId = INSPIRATION_VIDEOS[key];
+    if (!videoId) {
+      console.warn("[Report Trainer] Unknown inspiration video:", key);
+      return "Error: that video is not configured on this site.";
+    }
+    inspirationFrame.src =
+      "https://www.youtube.com/embed/" + videoId + "?autoplay=1";
+    inspirationModal.hidden = false;
+    return "Done. The video is now playing on screen.";
+  }
+
+  function closeInspirationVideo() {
+    inspirationModal.hidden = true;
+    inspirationFrame.src = "";   /* clears the iframe so playback stops */
+  }
+
+  if (inspirationClose) {
+    inspirationClose.addEventListener("click", closeInspirationVideo);
+  }
+  if (inspirationModal) {
+    inspirationModal.addEventListener("click", function (e) {
+      if (e.target === inspirationModal) closeInspirationVideo();
+    });
+  }
+
+  /* ── 2b. Client tool: open the dashboard in a new tab ──
+     The URL is hardcoded on purpose — same safety pattern as navigation
+     and inspiration videos: the agent triggers the action, it never
+     supplies or recites a URL itself.
+
+     PLACEHOLDER — same base/query as above; the dashboard's own default
+     view, not a specific page, unless you want this to open somewhere
+     specific. */
+
+  const REPORT_DIRECT_LINK = DATABRICKS_BASE + DATABRICKS_QUERY;
+
+  function openReportLink() {
+    window.open(REPORT_DIRECT_LINK, "_blank", "noopener");
+    return "Done. The dashboard has opened in a new browser tab.";
+  }
+
+  /* ── 3. Client tool: escalate to a human trainer ──
+     Direct fetch() from the browser to Power Automate — chosen because
+     the free Power Automate tier doesn't support the Condition step
+     needed to verify a secret server-side, which is what the more secure
+     "Webhook Tool" architecture (agent calls Power Automate directly,
+     secret stored in ElevenLabs) depends on. See README.md for the
+     tradeoff this accepts: the webhook URL below is visible in this
+     public repo's client-side code.
+
+     If this project shares a Power Automate flow/channel with another
+     Report Trainer product (e.g. the Power BI one), make sure the
+     "report" value below identifies the platform too, e.g.
+     "Databricks — [DASHBOARD_NAME]" — not just the dashboard's bare
+     name — so submissions aren't ambiguous in a shared Teams channel.
+
+     PLACEHOLDER: HANDOFF_WEBHOOK — the Power Automate trigger URL. */
+
+  const HANDOFF_WEBHOOK = "https://default2ee548e16be84729b86ef482e29d2c.9f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/451e4aab07094a5ba18a85afd0a8085d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=t-qqVgWweRwYRrjYD0tI4Ipf-Da7W4eKc2bO5MNOzlk";
+
+  const handoff = document.getElementById("handoff");
+  const handoffQuestion = document.getElementById("handoff-question");
+  const handoffEmail = document.getElementById("handoff-email");
+  const handoffSend = document.getElementById("handoff-send");
+  const handoffDone = document.getElementById("handoff-done");
+  const handoffClose = document.getElementById("handoff-close");
+
+  let pendingQuestion = "";
+
+  function requestHumanTrainer(params) {
+    pendingQuestion = params.question || "";
+    handoffQuestion.textContent = pendingQuestion
+      ? '"' + pendingQuestion + '"'
+      : "";
+    handoffDone.hidden = true;
+    handoffSend.disabled = false;
+    handoffEmail.disabled = false;
+    handoff.hidden = false;
+    handoffEmail.focus();
+    return "Done. A contact form is now open on screen — ask the user to " +
+           "enter their email there.";
+  }
+
+  function closeHandoff() { handoff.hidden = true; }
+
+  handoffClose.addEventListener("click", closeHandoff);
+  handoff.addEventListener("click", function (e) {
+    if (e.target === handoff) closeHandoff();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      closeHandoff();
+      closeInspirationVideo();
+    }
+  });
+
+  handoffSend.addEventListener("click", function () {
+    const email = handoffEmail.value.trim();
+    if (!email || email.indexOf("@") === -1) {
+      handoffEmail.focus();
+      return;
+    }
+
+    /* PLACEHOLDER: "[DASHBOARD_NAME]" — replace once the dashboard is
+       chosen. Keep the "Databricks — " prefix if this shares a webhook
+       with another Report Trainer product (see note above). */
+    const payload = {
+      question: pendingQuestion || "(not captured)",
+      email: email,
+      report: "Databricks — Retail Revenue & Supply Report"
+    };
+
+    console.info("[Report Trainer] Escalation submitted:", payload);
+
+    fetch(HANDOFF_WEBHOOK, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+    .then(function (r) {
+      console.info("[Report Trainer] Webhook response:", r.status, r.statusText);
+    })
+    .catch(function (err) {
+      console.error("[Report Trainer] Webhook failed:", err);
+    });
+
+    handoffSend.disabled = true;
+    handoffEmail.disabled = true;
+    handoffDone.hidden = false;
+    setTimeout(closeHandoff, 2500);
+  });
+
+  /* ── 4. Register the client tools when a call starts ── */
+  window.addEventListener("elevenlabs-convai:call", function (event) {
+    event.detail.config.clientTools = {
+      navigate_to_page: navigateToPage,
+      request_human_trainer: requestHumanTrainer,
+      show_inspiration_video: showInspirationVideo,
+      open_report_link: openReportLink
+    };
+  });
+
+  /* ── 5. Signed-in user (Azure Static Web Apps only) ──
+     On GitHub Pages /.auth/me doesn't exist — fails silently, so the same
+     code runs on both hosts. Note: Databricks itself also requires the
+     viewer to sign in (inside the iframe) — this badge is unrelated to
+     that; it only applies if you additionally host this page behind
+     Azure Static Web Apps auth. */
+  fetch("/.auth/me")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (data) {
+      const principal = data && data.clientPrincipal;
+      if (!principal) return;
+      document.getElementById("agent-user-name").textContent = principal.userDetails;
+      document.getElementById("agent-user").hidden = false;
+    })
+    .catch(function () { /* GitHub Pages — no auth endpoint, ignore */ });
+
+  /* ── 6. Widget load check ── */
+  window.addEventListener("load", function () {
+    setTimeout(function () {
+      if (!(window.customElements && window.customElements.get("elevenlabs-convai"))) {
+        console.error(
+          "[Report Trainer] ElevenLabs embed script did not load. " +
+          "Check network access to unpkg.com and any CSP headers."
+        );
+      }
+    }, 5000);
+  });
+})();

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report User Trainer — Retail Revenue &amp; Supply Report</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ── INTRO VIDEO OVERLAY (shown on page load) ── -->
+  <div class="video-overlay" id="video-overlay">
+    <div class="video-card">
+      <button class="video-close" id="video-close" title="Close">&times;</button>
+      <video id="intro-video" src="video/intro-video.mp4" autoplay playsinline></video>
+      <button class="video-unmute" id="video-unmute" title="Unmute">🔇 Tap for sound</button>
+    </div>
+  </div>
+
+  <!-- ── DASHBOARD (full width) ── -->
+  <main class="report-container">
+    <iframe
+      id="report-frame"
+      title="Retail Revenue &amp; Supply Report — Databricks dashboard"
+      src="https://adb-8477541654658543.3.azuredatabricks.net/embed/dashboardsv3/01f18b9f63f21fd882e303621bf1510a?o=8477541654658543"
+      frameborder="0"
+      allowfullscreen="true">
+    </iframe>
+  </main>
+
+  <!-- ── ELEVENLABS WIDGET (floating, bottom-right) ──
+       PLACEHOLDER: replace with this project's ElevenLabs agent ID. -->
+  <elevenlabs-convai agent-id="agent_5101kyn8qr32f0hs91byj0yab76t"></elevenlabs-convai>
+
+  <!-- ── HUMAN TRAINER ESCALATION (modal, opened by the agent's tool call) ── -->
+  <div class="modal-backdrop" id="handoff" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="handoff-title">
+      <button class="modal-close" id="handoff-close" title="Close">&times;</button>
+      <h2 id="handoff-title">Ask a human trainer</h2>
+      <p class="handoff-lead">
+        Leave your email and a trainer will follow up on this question.
+      </p>
+      <p class="handoff-q" id="handoff-question"></p>
+
+      <label class="handoff-label" for="handoff-email">Your email</label>
+      <input class="handoff-input" id="handoff-email" type="email"
+             placeholder="name@company.com" autocomplete="email">
+      <button class="handoff-send" id="handoff-send">Send to trainer</button>
+
+      <p class="handoff-done" id="handoff-done" hidden>
+        Sent. A trainer will follow up by email.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── INSPIRATION VIDEO (modal, opened by the agent's tool call) ──
+       No src placeholder needed here — this stays empty on purpose.
+       main.js sets it at runtime from INSPIRATION_VIDEOS (a dictionary of
+       YouTube video IDs, keyed by topic) — that's where the actual
+       PLACEHOLDER for the video ID belongs, not here. See main.js. -->
+  <div class="modal-backdrop" id="inspiration-video" hidden>
+    <div class="modal modal-video" role="dialog" aria-modal="true">
+      <button class="modal-close" id="inspiration-video-close" title="Close">&times;</button>
+      <div class="video-embed">
+        <iframe id="inspiration-video-frame"
+                src=""
+                title="Inspiration video"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen>
+        </iframe>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Signed-in user badge (Azure Static Web Apps only) -->
+  <div class="user-badge" id="agent-user" hidden>
+    <span id="agent-user-name"></span> &middot; <a href="/logout">Sign out</a>
+  </div>
+
+  <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
